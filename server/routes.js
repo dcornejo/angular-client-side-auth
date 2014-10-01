@@ -49,10 +49,12 @@ var routes = [
     {
         path: '/auth/google',
         httpMethod: 'GET',
-        middleware: [passport.authenticate('google')]
+        middleware: [passport.authenticate('google', {
+            scope: 'https://www.googleapis.com/auth/plus.profile.emails.read'
+        })]
     },
     {
-        path: '/auth/google/return',
+        path: '/auth/google/callback',
         httpMethod: 'GET',
         middleware: [passport.authenticate('google', {
             successRedirect: '/',

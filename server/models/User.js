@@ -4,7 +4,7 @@ var User
     , LocalStrategy =   require('passport-local').Strategy
     , TwitterStrategy = require('passport-twitter').Strategy
     , FacebookStrategy = require('passport-facebook').Strategy
-    , GoogleStrategy = require('passport-google').Strategy
+    , GoogleStrategy =  require('passport-google-oauth').OAuth2Strategy
     , LinkedInStrategy = require('passport-linkedin').Strategy
     , check =           require('validator').check
     , userRoles =       require('../../client/js/routingConfig').userRoles;
@@ -136,13 +136,17 @@ module.exports = {
     },
 
     googleStrategy: function() {
+        if (!process.env.GOOGLE_CLIENT_ID)     throw new Error('A Google client key is required if you want to enable login via Google.');
+        if (!process.env.GOOGLE_CLIENT_SECRET) throw new Error('A Google client secret is required if you want to enable login via Google.');
+        if (!process.env.GOOGLE_CALLBACK_URL)  throw new Error('A Google callback URL is required if you want to enable login via Google.');
 
         return new GoogleStrategy({
-            returnURL: process.env.GOOGLE_RETURN_URL || "http://localhost:8000/auth/google/return",
-            realm: process.env.GOOGLE_REALM || "http://localhost:8000/"
+             clientID: process.env.GOOGLE_CLIENT_ID,
+             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+             callbackURL: process.env.GOOGLE_CALLBACK_URL
         },
-        function(identifier, profile, done) {
-            var user = module.exports.findOrCreateOauthUser('google', identifier);
+        function(accessToken, refreshToken, profile, done) {
+            var user = module.exports.findOrCreateOauthUser(profile.provider, profile.id);
             done(null, user);
         });
     },
