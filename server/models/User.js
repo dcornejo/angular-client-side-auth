@@ -26,7 +26,9 @@ var users = [
 
 module.exports = {
     addUser: function(username, password, role, callback) {
-        if(this.findByUsername(username) !== undefined)  return callback("UserAlreadyExists");
+        this.findByUsername(username, function () {
+            return callback("UserAlreadyExists");
+        });
 
         // Clean up when 500 users reached
         if(users.length > 500) {
@@ -43,36 +45,36 @@ module.exports = {
         callback(null, user);
     },
 
-    findOrCreateOauthUser: function(provider, providerId) {
-        var user = module.exports.findByProviderId(provider, providerId);
-        if(!user) {
-            user = {
-                id: _.max(users, function(user) { return user.id; }).id + 1,
-                username: provider + '_user', // Should keep Oauth users anonymous on demo site
-                role: userRoles.user,
-                provider: provider
-            };
-            user[provider] = providerId;
-            users.push(user);
-        }
-
-        return user;
+    findOrCreateOauthUser: function(provider, providerId, displayName, callback) {
+        module.exports.findByProviderId(provider, providerId, function (user) {
+            if(!user) {
+                user = {
+                    id: _.max(users, function(user) { return user.id; }).id + 1,
+                    username: displayName,
+                    role: userRoles.user,
+                    provider: provider
+                };
+                user[provider] = providerId;
+                users.push(user);
+            }
+            callback (user);
+        });
     },
 
-    findAll: function() {
-        return _.map(users, function(user) { return _.clone(user); });
+    findAll: function(callback) {
+        callback (_.map(users, function(user) { return _.clone(user); }));
     },
 
-    findById: function(id) {
-        return _.clone(_.find(users, function(user) { return user.id === id }));
+    findById: function(id, callback) {
+        callback (_.clone(_.find(users, function(user) { return user.id === id })));
     },
 
-    findByUsername: function(username) {
-        return _.clone(_.find(users, function(user) { return user.username === username; }));
+    findByUsername: function(username, callback) {
+        callback (_.clone(_.find(users, function(user) { return user.username === username; })));
     },
 
-    findByProviderId: function(provider, id) {
-        return _.find(users, function(user) { return user[provider] === id; });
+    findByProviderId: function(provider, id, callback) {
+        callback (_.find(users, function(user) { return user[provider] === id; }));
     },
 
     validate: function(user) {
@@ -90,18 +92,17 @@ module.exports = {
     localStrategy: new LocalStrategy(
         function(username, password, done) {
 
-            var user = module.exports.findByUsername(username);
-
-            if(!user) {
-                done(null, false, { message: 'Incorrect username.' });
-            }
-            else if(user.password != password) {
-                done(null, false, { message: 'Incorrect username.' });
-            }
-            else {
-                return done(null, user);
-            }
-
+            module.exports.findByUsername(username, function (user) {
+                if(!user) {
+                    done(null, false, { message: 'Incorrect username.' });
+                }
+                else if(user.password != password) {
+                    done(null, false, { message: 'Incorrect username.' });
+                }
+                else {
+                    return done(null, user);
+                }
+            });
         }
     ),
 
@@ -146,8 +147,10 @@ module.exports = {
              callbackURL: process.env.GOOGLE_CALLBACK_URL
         },
         function(accessToken, refreshToken, profile, done) {
-            var user = module.exports.findOrCreateOauthUser(profile.provider, profile.id);
-            done(null, user);
+            //console.log ('fert ' + JSON.stringify (profile._json));
+            module.exports.findOrCreateOauthUser(profile.provider, profile.id, profile.displayName, function (user) {
+                done(null, user);
+            });
         });
     },
 
@@ -171,9 +174,13 @@ module.exports = {
     },
 
     deserializeUser: function(id, done) {
-        var user = module.exports.findById(id);
-
-        if(user)    { done(null, user); }
-        else        { done(null, false); }
+        module.exports.findById(id, function (user) {
+            if (user) {
+                done(null, user);
+            }
+            else {
+                done(null, false);
+            }
+        });
     }
 };
