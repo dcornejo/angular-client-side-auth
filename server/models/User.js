@@ -6,6 +6,7 @@ var User
     , FacebookStrategy = require('passport-facebook').Strategy
     , GoogleStrategy =  require('passport-google-oauth').OAuth2Strategy
     , LinkedInStrategy = require('passport-linkedin').Strategy
+    , db =              require('mysql')
     , check =           require('validator').check
     , userRoles =       require('../../client/js/routingConfig').userRoles;
 
@@ -24,10 +25,49 @@ var users = [
     }
 ];
 
+var db_pool = db.createPool({
+    host: 'localhost',
+    database: 'bbt',
+    user: 'root',
+    password: 'fuzzy!'
+});
+
+//TODO: fix the error cases below
+function dbQuery (query, callback) {
+    //console.log('dbQuery("' + query + '")');
+
+    // Get a connection to the database
+    db_pool.getConnection(function (err, connection) {
+        if (err) {
+            console.log (err);
+            callback (err, null);
+        }
+        else {
+            connection.query(
+                query,
+                function (err, rows, fields) {
+                    if (err) {
+                        console.log (err);
+                        callback (err, null);
+                    }
+                    else {
+                        var y = _.clone (rows);
+                        callback (false, rows);
+                    }
+                }
+            );
+            connection.release();
+        }
+    });
+};
+
+
 module.exports = {
     addUser: function(username, password, role, callback) {
-        this.findByUsername(username, function () {
-            return callback("UserAlreadyExists");
+        this.findByUsername(username, function (user) {
+            if (user) {
+                return callback("UserAlreadyExists");
+            }
         });
 
         // Clean up when 500 users reached
@@ -38,6 +78,7 @@ module.exports = {
         var user = {
             id:         _.max(users, function(user) { return user.id; }).id + 1,
             username:   username,
+            displayName: username,
             password:   password,
             role:       role
         };
